@@ -693,21 +693,28 @@ manim checkhealth
                 self.create_manim_bat_wrapper,  # Solution 5: Native Windows
             ]
 
-            # Apply all 5 DLL error prevention solutions
-            for i, strategy in enumerate(strategies, start = 1):
-                self.log("=" * 60)
-                self.log(f"APPLYING DLL ERROR PREVENTION STRATEGIE {i}")
-                self.log("=" * 60)
+            self.log("=" * 60)
+            self.log(f"APPLYING DLL ERROR PREVENTION STRATEGIE {i}")
+            self.log("=" * 60)
 
-                strategy()
+            self.copy_ffmpeg_dlls_to_venv()
+            self.log("=" * 60)
+
+            if not self.run_healthcheck():
+                self.log("Health check failed after first solution, applying additional strategies...", "WARN")
+                self.create_pth_file()  # Solution 2: Early loading
+                self.create_sitecustomize()  # Solution 3: Auto-load
+                self.create_render_script_template()  # Solution 4: Environment passing
+                self.create_manim_bat_wrapper()  # Solution 5: Native Windows
+                self.create_readme()
 
                 self.log("=" * 60)
-                if self.run_healthcheck():
-                    break
+                self.log("Please refer to MANIM_SETUP_README.md for information about the additional strategies. ", "INFO")
 
             self.log("=" * 60)
             self.log("SETUP COMPLETED SUCCESSFULLY!", "SUCCESS")
             self.log("=" * 60)
+
             
         except KeyboardInterrupt:
             self.log("\nSetup interrupted by user", "ERROR")

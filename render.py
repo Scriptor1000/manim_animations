@@ -1,7 +1,6 @@
 import os
 import re
-
-from render_manim import run_manim
+import subprocess
 
 scene_name = 'Task641036'
 file_name = 'math_olympiade.py'
@@ -15,14 +14,16 @@ qualities = {
     '2160p60': '-qk'
 }
 
-def run_and_rename(args):
-    result = run_manim(args)
+def run_and_rename(args: list[str]) -> list[str]:
+    cmd = ["python", "-m", "manim"] + args
+    result = subprocess.run(cmd, stdout=subprocess.PIPE)
     output = ''.join(map(lambda x: x.strip(), result.stdout.decode().splitlines()))
 
     pattern = r'\d+_\d+_\d+'
     matches = re.findall(re.compile(pattern), output)
 
     path_prefix = f'media/videos/{os.path.splitext(file_name)[0]}/{quality}/partial_movie_files/{scene_name}/'
+    new_filenames = []
 
     for idx, filename in enumerate(matches, start=1):
         new_path = path_prefix + f'{scene_name}_{idx}.mp4'
@@ -30,6 +31,9 @@ def run_and_rename(args):
         if os.path.exists(new_path):
             os.remove(new_path)
         os.rename(old_path, new_path)
+        new_filenames.append(new_path)
+
+    return new_filenames
 
 if __name__ == '__main__':
     run_and_rename([qualities[quality], file_name, scene_name])
