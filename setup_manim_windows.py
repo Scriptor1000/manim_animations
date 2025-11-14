@@ -27,8 +27,8 @@ class ManimWindowsSetup:
         self.base_dir = Path(__file__).parent.absolute()
         self.ffmpeg_dir = self.base_dir / "ffmpeg_portable"
         self.venv_dir = self.base_dir / ".venv"
-        self.ffmpeg_url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
-        
+        self.ffmpeg_url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-11-14-13-14/ffmpeg-n7.1.2-9-g5418fbb7f4-win64-gpl-shared-7.1.zip"
+
     def log(self, message, level="INFO"):
         """Log a message with proper formatting."""
         print(f"[{level}] {message}")
@@ -599,7 +599,7 @@ This directory contains a portable manim installation for Windows.
 
 This setup includes 5 different solutions to prevent DLL load errors. Any method should work!
 
-### Method 1: Python Render Script (RECOMMENDED ⭐)
+### Method 1: Python Render Script (RECOMMENDED )
 The `render_manim.py` script ensures FFmpeg is in PATH:
 
 ```
@@ -609,7 +609,7 @@ python render_manim.py checkhealth
 
 **Why this works:** Sets environment and passes it to subprocess.
 
-### Method 2: Windows BAT Wrapper (Native Solution ⭐)
+### Method 2: Windows BAT Wrapper (Native Solution )
 Use the native Windows batch file:
 
 ```
@@ -661,7 +661,7 @@ manim checkhealth
 ## Troubleshooting:
 - **If one method doesn't work, try another!**
 - All 5 solutions are independent and complementary
-- Recommended order: manim.bat → render_manim.py → direct venv Python
+- Recommended order: manim.bat --> render_manim.py --> direct venv Python
 """
         
         with open(readme_path, 'w') as f:
