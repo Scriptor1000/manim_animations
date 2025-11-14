@@ -403,8 +403,7 @@ def run_manim(args):
     
     try:
         # Pass environment explicitly to subprocess
-        result = subprocess.run(cmd, env=env)
-        sys.exit(result.returncode)
+        return subprocess.run(cmd, env=env, stdout=subprocess.PIPE)
     except KeyboardInterrupt:
         print("\\nInterrupted by user")
         sys.exit(1)
@@ -424,7 +423,8 @@ if __name__ == "__main__":
         print("  python render_manim.py checkhealth")
         sys.exit(1)
     
-    run_manim(args)
+    result = run_manim(args)
+    sys.exit(result.returncode)
 '''
         with open(render_template_path, 'w', newline='\n') as f:
             f.write(template_content)
@@ -569,6 +569,7 @@ echo ""
             
             if result.returncode == 0:
                 self.log("Health check passed!", "SUCCESS")
+                return True
             else:
                 self.log("Health check completed with warnings", "WARN")
                 
@@ -576,6 +577,7 @@ echo ""
             self.log("Health check timed out", "WARN")
         except Exception as e:
             self.log(f"Could not run health check: {e}", "WARN")
+        return False
     
     def create_readme(self):
         """Create a README file with usage instructions."""
@@ -681,59 +683,31 @@ manim checkhealth
             self.create_venv()
             self.upgrade_pip()
             self.install_packages()
-            
+            self.log("")
+
+            strategies = [
+                self.copy_ffmpeg_dlls_to_venv,  # Solution 1: Most reliable
+                self.create_pth_file,  # Solution 2: Early loading
+                self.create_sitecustomize,  # Solution 3: Auto-load
+                self.create_render_script_template,  # Solution 4: Environment passing
+                self.create_manim_bat_wrapper,  # Solution 5: Native Windows
+            ]
+
             # Apply all 5 DLL error prevention solutions
-            self.log("")
-            self.log("=" * 60)
-            self.log("APPLYING MULTIPLE DLL ERROR PREVENTION STRATEGIES")
-            self.log("=" * 60)
-            
-            self.copy_ffmpeg_dlls_to_venv()  # Solution 1: Most reliable
-            self.create_pth_file()  # Solution 2: Early loading
-            self.create_sitecustomize()  # Solution 3: Auto-load
-            self.create_render_script_template()  # Solution 4: Environment passing
-            self.create_manim_bat_wrapper()  # Solution 5: Native Windows
-            self.create_activation_script()  # Additional: Shell activation
-            
-            self.log("=" * 60)
-            self.log("")
-            
-            self.create_readme()
-            self.run_healthcheck()
-            
+            for i, strategy in enumerate(strategies, start = 1):
+                self.log("=" * 60)
+                self.log(f"APPLYING DLL ERROR PREVENTION STRATEGIE {i}")
+                self.log("=" * 60)
+
+                strategy()
+
+                self.log("=" * 60)
+                if self.run_healthcheck():
+                    break
+
             self.log("=" * 60)
             self.log("SETUP COMPLETED SUCCESSFULLY!", "SUCCESS")
             self.log("=" * 60)
-            self.log("")
-            self.log("🎉 5 DLL Error Prevention Solutions Installed! 🎉")
-            self.log("")
-            self.log("You can use any of these methods (all should work):")
-            self.log("")
-            self.log("METHOD 1 (Most Reliable): Python render script")
-            self.log("  python render_manim.py checkhealth")
-            self.log("  python render_manim.py scene.py SceneName -ql")
-            self.log("")
-            self.log("METHOD 2 (Windows Native): Batch wrapper")
-            if platform.system() == "Windows":
-                self.log("  manim.bat checkhealth")
-                self.log("  manim.bat scene.py SceneName -ql")
-            self.log("")
-            self.log("METHOD 3 (Direct): Use venv Python directly")
-            if platform.system() == "Windows":
-                self.log("  .venv\\Scripts\\python.exe -m manim checkhealth")
-            else:
-                self.log("  .venv/bin/python -m manim checkhealth")
-            self.log("")
-            self.log("METHOD 4 (Shell): Activate environment")
-            if platform.system() == "Windows":
-                self.log("  activate_manim.bat")
-            else:
-                self.log("  source activate_manim.sh")
-            self.log("  manim checkhealth")
-            self.log("")
-            self.log("All methods have FFmpeg DLLs available!")
-            self.log("See MANIM_SETUP_README.md for details")
-            self.log("")
             
         except KeyboardInterrupt:
             self.log("\nSetup interrupted by user", "ERROR")
