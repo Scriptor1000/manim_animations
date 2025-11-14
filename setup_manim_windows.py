@@ -182,6 +182,153 @@ class ManimWindowsSetup:
                 self.log(f"STDERR: {e.stderr}", "ERROR")
             sys.exit(1)
     
+    def create_sitecustomize(self):
+        """Create sitecustomize.py to automatically add ffmpeg to PATH."""
+        self.log("Creating sitecustomize.py for automatic ffmpeg PATH setup...")
+        
+        # Get the site-packages directory in the venv
+        python_exe = self.get_venv_python()
+        
+        try:
+            result = subprocess.run(
+                [str(python_exe), "-c", "import site; print(site.getsitepackages()[0])"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            site_packages = Path(result.stdout.strip())
+            
+            sitecustomize_path = site_packages / "sitecustomize.py"
+            ffmpeg_bin = self.ffmpeg_dir / "bin"
+            
+            # Create sitecustomize.py that adds ffmpeg to PATH on import
+            sitecustomize_content = f'''"""
+Automatically add ffmpeg to PATH when Python starts.
+This ensures PyAV can find ffmpeg DLLs.
+"""
+import os
+import sys
+
+# Add ffmpeg to PATH
+FFMPEG_BIN = r"{ffmpeg_bin}"
+
+if os.path.exists(FFMPEG_BIN):
+    # Add to front of PATH so it takes precedence
+    if FFMPEG_BIN not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = FFMPEG_BIN + os.pathsep + os.environ.get("PATH", "")
+        
+    # On Windows, also add to DLL search path
+    if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
+        try:
+            os.add_dll_directory(FFMPEG_BIN)
+        except (OSError, AttributeError):
+            pass
+'''
+            
+            with open(sitecustomize_path, 'w', newline='\n') as f:
+                f.write(sitecustomize_content)
+            
+            self.log(f"Created sitecustomize.py at: {sitecustomize_path}")
+            self.log("FFmpeg will be automatically available when using this venv")
+            
+        except Exception as e:
+            self.log(f"Warning: Could not create sitecustomize.py: {e}", "WARN")
+            self.log("You will need to activate the environment with activate_manim.bat", "WARN")
+    
+    def create_render_script_template(self):
+        """Create a render script template that sets up environment properly."""
+        self.log("Creating render script template...")
+        
+        render_template_path = self.base_dir / "render_manim.py"
+        ffmpeg_bin = self.ffmpeg_dir / "bin"
+        venv_python = self.get_venv_python()
+        
+        template_content = f'''#!/usr/bin/env python3
+"""
+Manim Render Script with Automatic FFmpeg Setup
+This script ensures FFmpeg is available before running manim.
+
+Usage:
+    python render_manim.py scene.py SceneName -ql
+    python render_manim.py --help
+"""
+
+import os
+import sys
+import subprocess
+from pathlib import Path
+
+# Setup paths
+SCRIPT_DIR = Path(__file__).parent.absolute()
+FFMPEG_BIN = SCRIPT_DIR / "ffmpeg_portable" / "bin"
+VENV_PYTHON = SCRIPT_DIR / ".venv" / {"'Scripts'" if platform.system() == "Windows" else "'bin'"} / {"'python.exe'" if platform.system() == "Windows" else "'python'"}
+
+def setup_environment():
+    """Add FFmpeg to PATH and DLL search directories."""
+    if FFMPEG_BIN.exists():
+        # Add to PATH
+        ffmpeg_bin_str = str(FFMPEG_BIN)
+        if ffmpeg_bin_str not in os.environ.get("PATH", ""):
+            os.environ["PATH"] = ffmpeg_bin_str + os.pathsep + os.environ.get("PATH", "")
+        
+        # On Windows, also add to DLL search path
+        if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
+            try:
+                os.add_dll_directory(str(FFMPEG_BIN))
+            except (OSError, AttributeError):
+                pass
+    else:
+        print(f"WARNING: FFmpeg directory not found at {{FFMPEG_BIN}}")
+        print("Please run setup_manim_windows.py first!")
+        sys.exit(1)
+
+def run_manim(args):
+    """Run manim with the provided arguments."""
+    # Ensure we're using the venv Python
+    if not VENV_PYTHON.exists():
+        print(f"ERROR: Virtual environment Python not found at {{VENV_PYTHON}}")
+        print("Please run setup_manim_windows.py first!")
+        sys.exit(1)
+    
+    # Setup environment
+    setup_environment()
+    
+    # Run manim
+    cmd = [str(VENV_PYTHON), "-m", "manim"] + args
+    print(f"Running: {{' '.join(cmd)}}")
+    print("-" * 60)
+    
+    try:
+        result = subprocess.run(cmd)
+        sys.exit(result.returncode)
+    except KeyboardInterrupt:
+        print("\\nInterrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        print(f"ERROR: {{e}}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    # Pass all command line arguments to manim
+    args = sys.argv[1:]
+    
+    if not args:
+        print("Usage: python render_manim.py [manim arguments]")
+        print("Examples:")
+        print("  python render_manim.py scene.py SceneName -ql")
+        print("  python render_manim.py --help")
+        print("  python render_manim.py checkhealth")
+        sys.exit(1)
+    
+    run_manim(args)
+'''
+        
+        with open(render_template_path, 'w', newline='\n') as f:
+            f.write(template_content)
+        
+        self.log(f"Created render script template: {render_template_path.name}")
+        self.log("You can now run: python render_manim.py scene.py SceneName -ql")
+    
     def create_activation_script(self):
         """Create a script to activate the environment with ffmpeg in PATH."""
         self.log("Creating activation script...")
@@ -239,8 +386,17 @@ echo "Or test with: manim healthcheck"
 echo ""
 """
         
-        with open(script_path, 'w', newline='\n') as f:
-            f.write(script_content)
+        # Use appropriate line endings for the platform
+        if platform.system() == "Windows":
+            # Windows batch files need CRLF line endings
+            newline = '\r\n'
+        else:
+            # Unix shell scripts use LF
+            newline = '\n'
+        
+        with open(script_path, 'w', newline='') as f:
+            # Replace \n with appropriate line ending
+            f.write(script_content.replace('\n', newline))
         
         # Make executable on Unix systems
         if platform.system() != "Windows":
@@ -308,7 +464,18 @@ This directory contains a portable manim installation for Windows.
 
 ## How to use:
 
-### Windows:
+### Method 1: Using the Render Script (RECOMMENDED - Most Reliable)
+The `render_manim.py` script automatically sets up FFmpeg and runs manim:
+
+```
+python render_manim.py scene.py SceneName -ql
+python render_manim.py checkhealth
+python render_manim.py --help
+```
+
+This method is guaranteed to work because it handles all environment setup automatically.
+
+### Method 2: Windows Activation Script
 1. Run the activation script:
    ```
    activate_manim.bat
@@ -326,6 +493,14 @@ This directory contains a portable manim installation for Windows.
    deactivate
    ```
 
+### Method 3: Direct venv Python (Advanced)
+```
+.venv\\Scripts\\python.exe -m manim checkhealth
+.venv\\Scripts\\python.exe -m manim -pql scene.py MyScene
+```
+
+Note: This works due to sitecustomize.py, but Method 1 (render script) is more reliable.
+
 ### Linux (for testing):
 1. Run the activation script:
    ```
@@ -338,11 +513,14 @@ This directory contains a portable manim installation for Windows.
 - FFmpeg is NOT installed system-wide
 - The system PATH is NOT modified
 - Everything is contained in this directory
-- You must activate the environment before using manim
+- **Three layers of protection against DLL errors**:
+  1. `render_manim.py` - Render script with built-in environment setup (RECOMMENDED)
+  2. `sitecustomize.py` - Automatic FFmpeg loading when using venv Python
+  3. `activate_manim.bat` - Shell environment setup
 
 ## Troubleshooting:
-- If manim cannot find ffmpeg, make sure you activated the environment with the activation script
-- If you get permission errors, try running as administrator (Windows) or with sudo (Linux)
+- **"DLL load failed" error**: Use `python render_manim.py` instead of calling manim directly
+- **Best practice**: Always use `python render_manim.py [args]` for running manim
 """
         
         with open(readme_path, 'w') as f:
@@ -362,6 +540,8 @@ This directory contains a portable manim installation for Windows.
             self.create_venv()
             self.upgrade_pip()
             self.install_packages()
+            self.create_sitecustomize()
+            self.create_render_script_template()
             self.create_activation_script()
             self.create_readme()
             self.run_healthcheck()
@@ -371,12 +551,16 @@ This directory contains a portable manim installation for Windows.
             self.log("=" * 60)
             self.log("")
             self.log("Next steps:")
+            self.log("RECOMMENDED: Use the render script (most reliable):")
+            self.log("  python render_manim.py checkhealth")
+            self.log("  python render_manim.py scene.py SceneName -ql")
+            self.log("")
+            self.log("Alternative: Activate the environment:")
             if platform.system() == "Windows":
-                self.log("1. Run: activate_manim.bat")
+                self.log("  activate_manim.bat")
             else:
-                self.log("1. Run: source activate_manim.sh")
-            self.log("2. Test: manim checkhealth")
-            self.log("3. Start creating animations!")
+                self.log("  source activate_manim.sh")
+            self.log("  manim checkhealth")
             self.log("")
             self.log("See MANIM_SETUP_README.md for more information")
             

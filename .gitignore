@@ -7,3 +7,4 @@ ffmpeg_temp
 activate_manim.bat
 activate_manim.sh
 MANIM_SETUP_README.md
+render_manim.py
