@@ -243,7 +243,7 @@ if os.path.exists(FFMPEG_BIN):
         ffmpeg_bin = self.ffmpeg_dir / "bin"
         venv_python = self.get_venv_python()
         
-        template_content = f'''#!/usr/bin/env python3
+        template_content = '''#!/usr/bin/env python3
 """
 Manim Render Script with Automatic FFmpeg Setup
 This script ensures FFmpeg is available before running manim.
@@ -256,12 +256,18 @@ Usage:
 import os
 import sys
 import subprocess
+import platform
 from pathlib import Path
 
 # Setup paths
 SCRIPT_DIR = Path(__file__).parent.absolute()
 FFMPEG_BIN = SCRIPT_DIR / "ffmpeg_portable" / "bin"
-VENV_PYTHON = SCRIPT_DIR / ".venv" / {"'Scripts'" if platform.system() == "Windows" else "'bin'"} / {"'python.exe'" if platform.system() == "Windows" else "'python'"}
+
+# Determine venv Python path based on platform
+if platform.system() == "Windows":
+    VENV_PYTHON = SCRIPT_DIR / ".venv" / "Scripts" / "python.exe"
+else:
+    VENV_PYTHON = SCRIPT_DIR / ".venv" / "bin" / "python"
 
 def setup_environment():
     """Add FFmpeg to PATH and DLL search directories."""
@@ -278,7 +284,7 @@ def setup_environment():
             except (OSError, AttributeError):
                 pass
     else:
-        print(f"WARNING: FFmpeg directory not found at {{FFMPEG_BIN}}")
+        print(f"WARNING: FFmpeg directory not found at {FFMPEG_BIN}")
         print("Please run setup_manim_windows.py first!")
         sys.exit(1)
 
@@ -286,7 +292,7 @@ def run_manim(args):
     """Run manim with the provided arguments."""
     # Ensure we're using the venv Python
     if not VENV_PYTHON.exists():
-        print(f"ERROR: Virtual environment Python not found at {{VENV_PYTHON}}")
+        print(f"ERROR: Virtual environment Python not found at {VENV_PYTHON}")
         print("Please run setup_manim_windows.py first!")
         sys.exit(1)
     
@@ -295,7 +301,7 @@ def run_manim(args):
     
     # Run manim
     cmd = [str(VENV_PYTHON), "-m", "manim"] + args
-    print(f"Running: {{' '.join(cmd)}}")
+    print(f"Running: {' '.join(cmd)}")
     print("-" * 60)
     
     try:
@@ -305,7 +311,7 @@ def run_manim(args):
         print("\\nInterrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"ERROR: {{e}}")
+        print(f"ERROR: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
